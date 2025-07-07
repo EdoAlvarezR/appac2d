@@ -7,9 +7,12 @@ filepath = fileparts( filename );
 
 addpath([filepath '/mesh2d']); initmsh();
 
-% Medium-scale high-geometric-complexity aeropropulsive problem %%%%%%%%%%%%%%
-surfaceFiles = {'dengwirda/mainElement.dat','dengwirda/nacelle.dat', ...
-   'dengwirda/foreFlap.dat','dengwirda/aftFlap.dat','onr-dep/krueger.dat'};
+% % Medium-scale high-geometric-complexity aeropropulsive problem %%%%%%%%%%%%%%
+% surfaceFiles = {'dengwirda/mainElement.dat','dengwirda/nacelle.dat', ...
+%    'dengwirda/foreFlap.dat','dengwirda/aftFlap.dat','onr-dep/krueger.dat'};
+
+% surfaceFiles = {'minimaljetfoil/lower-open.dat','minimaljetfoil/upper-open.dat'};
+surfaceFiles = {'minimaljetfoil/lower-closed.dat','minimaljetfoil/upper-closed.dat'};
 
 for i = numel(surfaceFiles):-1:1
     fid = fopen([filepath '/airfoils/' surfaceFiles{i}],'r');
