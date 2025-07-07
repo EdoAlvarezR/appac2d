@@ -1,4 +1,4 @@
-function [Cp,xc,varargout] = panel2d(surfaces,alphaDeg,varargin)
+function [Cp,xc,Cl,Cd,Cm,varargout] = panel2d(surfaces,alphaDeg,varargin)
 % PANEL2D  Panel method in two dimensions.
 %   PANEL2D(SURFACES,ALPHADEG) runs a standard panel method.
 %   PANEL2D(SURFACES,ALPHADEG,CT,XDISK) runs the APPAC aeropropulsive analysis
@@ -91,7 +91,7 @@ end
 % Print integrated values at the very end
 fprintf(1,'%+4s: %8.5f\n','Cl',Cl,'Cd',Cd,'Cm25',Cm25);
 
-nout = max(nargout,1) - 2;
+nout = max(nargout,1) - 5;
 for i = 1:nout
     varargout{i} = out{i};
 end
