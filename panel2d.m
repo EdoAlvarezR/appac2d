@@ -71,8 +71,12 @@ xc = mat2cell(foils.co*R(1,:).', foils.m);
 if oper == 2
     % Correct Cp aft of the actuator disk where the total pressure is higher
     k1 = find(xc{1} < xDisk, 1, 'last');
-    k2 = find(xc{2} < xDisk, 1, 'first');
-    Cparr(k1+1:foils.m(1)+k2-1) = Cparr(k1+1:foils.m(1)+k2-1) + 2*CT;
+    % k2 = find(xc{2} < xDisk, 1, 'first');
+    % Cparr(k1+1:foils.m(1)+k2-1) = Cparr(k1+1:foils.m(1)+k2-1) + 2*CT;
+
+    k2 = find(xc{2} < xDisk, 1, 'last');
+    Cparr(k1+1:foils.m(1)+1) = Cparr(k1+1:foils.m(1)+1) + 2*CT;
+    Cparr(foils.m(1)+k2:foils.m(1)+foils.m(2)) = Cparr(foils.m(1)+k2:foils.m(1)+foils.m(2)) + 2*CT;
 end
 
 Cl = -Cparr.'*foils.dx;
