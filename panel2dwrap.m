@@ -1,6 +1,6 @@
 function out = panel2dwrap(surfaces,alphaDeg,varargin)
 
-    [Cp,xc,Cl,Cd,Cm,foils,wakes] = panel2d(surfaces,alphaDeg,varargin{:});
+    [Cp,xc,Cl,Cd,Cm,visout,foils,wakes] = panel2d(surfaces,alphaDeg,varargin{:});
 
     out.Cp = Cp;
     out.xc = xc;
@@ -9,5 +9,6 @@ function out = panel2dwrap(surfaces,alphaDeg,varargin)
     out.Cm = Cm;
     out.foils = foils;
     out.wakes = wakes;
+    out.visout = visout;
 
 end

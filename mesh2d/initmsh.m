@@ -1,4 +1,4 @@
-function initmsh
+function filepath = initmsh
 %INITMSH a helper function to set-up MATLAB's path statement
 %for MESH2D.
 %

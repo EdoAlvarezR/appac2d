@@ -1,4 +1,4 @@
-function [Cp,xc,Cl,Cd,Cm,varargout] = panel2d(surfaces,alphaDeg,varargin)
+function [Cp,xc,Cl,Cd,Cm,visout,varargout] = panel2d(surfaces,alphaDeg,varargin)
 % PANEL2D  Panel method in two dimensions.
 %   PANEL2D(SURFACES,ALPHADEG) runs a standard panel method.
 %   PANEL2D(SURFACES,ALPHADEG,CT,XDISK) runs the APPAC aeropropulsive analysis
@@ -60,24 +60,8 @@ else
     [U,V] = influence(foils.co,wakes,1);
     D = U.*cos(foils.theta) + V.*sin(foils.theta);
     Qtan = B*foils.gamma + cos(foils.theta) + D*wakes.gamma;
-    % Qtan = cos(foils.theta) + D*wakes.gamma;
     out = {foils,wakes};
 end
-
-% % Qtan(1:foils.m(1)) = Qtan(1:foils.m(1)) + (foils.gamma(2:foils.m(1)+1) + foils.gamma(1:foils.m(1)))/2;
-
-% Qtan(1:foils.m(1)) = Qtan(1:foils.m(1)) + (foils.gamma(2:foils.m(1)+1) + foils.gamma(1:foils.m(1)))/4;
-
-
-% % Qtan(foils.m(1)+1:foils.m(1)+foils.m(2)) = Qtan(foils.m(1)+1:foils.m(1)+foils.m(2)) - ...
-% %             (foils.gamma(foils.m(1)+2:foils.m(1)+foils.m(2)+1) + foils.gamma(foils.m(1)+3:foils.m(1)+foils.m(2)+2))/4;
-
-% qt = mat2cell(Qtan, foils.m)
-% gammas = mat2cell(foils.gamma, foils.m+1)
-
-% Qtan(foils.m(1)+1:foils.m(1)+foils.m(2)) = qt{2} - (gammas{2}(1:end-1) + gammas{2}(2:end))/2/2
-
-% % Qtan(foils.m(1)+1:foils.m(1)+foils.m(2)) = Qtan(foils.m(1)+1:foils.m(1)+foils.m(2)) + (foils.gamma(foils.m(1)+1:foils.m(1)+foils.m(2)) + foils.gamma(foils.m(1)+2:foils.m(1)+foils.m(2)+1))/2;
 
 % Calculate coefficients %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Cparr = 1 - Qtan.^2;
@@ -88,11 +72,8 @@ if oper == 2
     % Correct Cp aft of the actuator disk where the total pressure is higher
     k1 = find(xc{1} < xDisk, 1, 'last');
     k2 = find(xc{2} < xDisk, 1, 'first');
-    Cparr(k1+1:foils.m(1)+k2-1) = Cparr(k1+1:foils.m(1)+k2-1) + 2*CT;
-
-    % k2 = find(xc{2} < xDisk, 1, 'last');
-    % Cparr(k1+1:foils.m(1)+1) = Cparr(k1+1:foils.m(1)+1) + 2*CT;
-    % Cparr(foils.m(1)+k2:foils.m(1)+foils.m(2)) = Cparr(foils.m(1)+k2:foils.m(1)+foils.m(2)) + 2*CT;
+    idx = getCpCorrectionIds(foils,wakes,k1,k2);
+    Cparr(idx) = Cparr(idx) + 2*CT;
 end
 
 Cl = -Cparr.'*foils.dx;
@@ -103,15 +84,16 @@ Cm25 = Cm + 0.25*Cl;
 Cp = mat2cell(Cparr, foils.m);
 
 % Data visualization %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+visout = -1;
 if strcmpi(options.Plot,'on')
-    if oper == 1; flowVis(options,foils); end
-    if oper == 2; flowVis(options,foils,wakes,k1,k2); end
+    if oper == 1; visout = flowVis(options,foils); end
+    if oper == 2; visout = flowVis(options,foils,wakes,k1,k2); end
 end
 
 % Print integrated values at the very end
 fprintf(1,'%+4s: %8.5f\n','Cl',Cl,'Cd',Cd,'Cm25',Cm25);
 
-nout = max(nargout,1) - 5;
+nout = max(nargout,1) - 6;
 for i = 1:nout
     varargout{i} = out{i};
 end
@@ -188,4 +170,32 @@ for i = 1:2:numel(NameValuePairs)-1
     end
     options.(names{k}) = NameValuePairs{i+1};
 end
+end
+
+function in = getCpCorrectionIds(foils,wakes,k1,k2)
+% GETCPCORRECTIONIDS  Get indices of control points that need Cp correction
+%   The method of creating the bounding polygon for the domain of increased
+%   total pressure is taken from FLOWVIS.
+bb = [min(foils.co),max(foils.co)]; % bounding box
+bb = bb + [-0.7 -0.7 0.7 0.5];
+
+N = wakes.m(1);
+% Distinguish jet and outer flow eval by making one wake left-running
+wakes.xo(1:N) = wakes.xo(1:N) + wakes.dx(1:N);
+wakes.yo(1:N) = wakes.yo(1:N) + wakes.dy(1:N);
+wakes.dx(1:N) = -wakes.dx(1:N);
+wakes.dy(1:N) = -wakes.dy(1:N);
+wakes.theta(1:N) = wakes.theta(1:N)+pi - ceil(wakes.theta(1:N)/2/pi)*2*pi;
+
+%--------------------------------------- Mesh jet volume
+k3 = find(wakes.co(  1:N  ,1)>=bb(3),1);
+k4 = find(wakes.co(N+1:2*N,1)>=bb(3),1) + N;
+node = [flipud(wakes.co(N+1:k4,:)); ...
+        foils.co(foils.m(1)+(1:k2-1),:); ...
+        foils.co(k1+1:foils.m(1),:); ...
+        wakes.co(1:k3,:)];
+
+edge = (1:size(node,1)).' + [0 1]; edge(end,2) = 1;
+
+in = inpoly2(foils.co,node,edge);
 end

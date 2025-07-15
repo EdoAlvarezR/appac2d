@@ -1,4 +1,4 @@
-function fig = flowVis(options,foils,varargin)
+function visout = flowVis(options,foils,varargin)
 % FLOWVIS  Visualize flow around surfaces with bound vorticity.
 %   FLOWVIS(OPTIONS,FOILS,WAKES,K1,K2) creates a contour plot with overlaid
 %   streamlines using the style specified in OPTIONS. At minimum, the unified
@@ -58,12 +58,12 @@ if nargin == 5
 
     edge = (1:size(node,1)).' + [0 1]; edge(end,2) = 1;
 
-    if numel(foils.m) > 2
-        j = cumsum(foils.m(3:end));
-        edge = [edge;(1:j(end)).'+[0 1]+size(node,1)];
-        edge(size(node,1)+j,2) = edge(size(node,1)+j,2) - foils.m(3:end).';
-        node = [node;foils.co(foils.m(1)+foils.m(2)+1:end,:)];
-    end
+    % if numel(foils.m) > 2
+    %     j = cumsum(foils.m(3:end));
+    %     edge = [edge;(1:j(end)).'+[0 1]+size(node,1)];
+    %     edge(size(node,1)+j,2) = edge(size(node,1)+j,2) - foils.m(3:end).';
+    %     node = [node;foils.co(foils.m(1)+foils.m(2)+1:end,:)];
+    % end
 
     [vert{2},~,tria{2},~] = refine2(node,edge,[],opts);
 
@@ -140,3 +140,8 @@ set(fig,'Position',pos);
 set(gca,'Position',[0 0 1 1]);
 
 %print(fig,'-r300','multielement-1','-dpng');
+
+visout.fig = fig;
+visout.VTX = VTX;
+visout.TRI = TRI;
+visout.data = data;
