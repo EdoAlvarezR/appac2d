@@ -8,11 +8,19 @@ function visout = flowVis(options,foils,varargin)
 %   ing the nodes (one on each surface) where the actuator disk is located.
 
 % Meshing settings (not user defined)
-opts.kind = 'delfront';
-opts.rho2 = 1;
+opts.kind = 'DELAUNAY';
+opts.rho2 = 1.0;
+opts.siz1 = 0.5;
+opts.siz2 = 0.5;
+
+olfs.dhdx = +0.15;
+hfun = @trihfn2;
 
 bb = [min(foils.co),max(foils.co)]; % bounding box
 bb = bb + [-0.7 -0.7 0.7 0.5];
+
+
+%---------------------------------------------- do size-fun.
 
 if nargin == 5
     wakes = varargin{1};
@@ -38,7 +46,10 @@ if nargin == 5
 
     edge = (1:size(node,1)).' + [0 1]; edge(end,2) = 1;
 
-    [vert{1},~,tria{1},~] = refine2(node,edge,[],opts);
+    [vlfs,tlfs, hlfs] = lfshfn2(node,edge,[],olfs);
+    [slfs] = idxtri2(vlfs,tlfs);
+
+    [vert{1},~,tria{1},~] = refine2(node,edge,[],opts,hfun,vlfs,tlfs,slfs,hlfs);
 
     [U,V] = influence(vert{1},foils,1);
     u{1} = U*foils.gamma + 1;
@@ -65,7 +76,11 @@ if nargin == 5
     %     node = [node;foils.co(foils.m(1)+foils.m(2)+1:end,:)];
     % end
 
-    [vert{2},~,tria{2},~] = refine2(node,edge,[],opts);
+
+    [vlfs,tlfs, hlfs] = lfshfn2(node,edge,[],olfs);
+    [slfs] = idxtri2(vlfs,tlfs);
+
+    [vert{2},~,tria{2},~] = refine2(node,edge,[],opts,hfun,vlfs,tlfs,slfs,hlfs);
 
     [U,V] = influence(vert{2},foils,1);
     u{2} = U*foils.gamma + 1;
@@ -83,7 +98,12 @@ else
     node = [foils.co;4 2;-2 2;-2 -2;4 -2];
     edge = (1:j(end)+4).' + [0 1]; edge(j,2) = edge(j,2) - foils.m.';
     edge(end,2) = j(end) + 1;
-    [VTX,~,TRI,~] = refine2(node,edge,[],opts);
+
+
+    [vlfs,tlfs, hlfs] = lfshfn2(node,edge,[],olfs);
+    [slfs] = idxtri2(vlfs,tlfs);
+
+    [VTX,~,TRI,~] = refine2(node,edge,[],opts,hfun,vlfs,tlfs,slfs,hlfs);
     [U,V] = influence(VTX,foils,1);
     data.u = U*foils.gamma + 1;
     data.v = V*foils.gamma;
