@@ -12,29 +12,30 @@ function [wakes,gamma,iter,E] = solveWake(foils,Ainv,RHS,CT,opts)
 %   7. If the new wake circulation is close to the previous solution, exit the
 %      program, else return to step 2
 
-% Attach line wake to the trailing edge of each propulsive element %%%%%%%%%%%
+% Attach wake to the trailing edge of each propulsive element %%%%%%%%%%%%%%%%
 N = opts.NumPanels + 1; % add far-field panel to the panel count
 wakes.m = [N N];
-% Calculate the direction to which the initial wakes are aligned
-d1 = sqrt(foils.dx(foils.m(1)  )^2 + foils.dy(foils.m(1)  )^2);
-d2 = sqrt(foils.dx(foils.m(1)+1)^2 + foils.dy(foils.m(1)+1)^2);
-rx = 0.5*(foils.dx(foils.m(1))/d1 - foils.dx(foils.m(1)+1)/d2);
-ry = 0.5*(foils.dy(foils.m(1))/d1 - foils.dy(foils.m(1)+1)/d2);
+[xinit,yinit,traj] = initWake(foils,Ainv*RHS); % obtain starting wake shape
 for i = 2:-1:1
     k = (i-1)*N+(1:N);
-    if strcmpi(opts.NodeSpacing,'cosine')
-        stencil = opts.WakeLengthChords*(1-cos(linspace(0,pi/2,N))).';
-    elseif strcmpi(opts.NodeSpacing,'uniform')
-        stencil = linspace(0,opts.WakeLengthChords,N).';
-    end
-    wakes.xo(k,:) = foils.xo(1+(i-1)*foils.m(1)) + rx*stencil;
-    wakes.yo(k,:) = foils.yo(1+(i-1)*foils.m(1)) + ry*stencil;
-    wakes.dx(k,:) = [diff(wakes.xo(k)); 1e3*rx];
-    wakes.dy(k,:) = [diff(wakes.yo(k)); 1e3*ry];
+    x = xinit{i}; y = yinit{i}; n = numel(x);
+    stencil = linspace(0,opts.WakeLengthChords,N-n+1).';
+    % if strcmpi(opts.NodeSpacing,'cosine')
+    %     wakes.xo(k,:) = foils.xo(1+(i-1)*foils.m(1)) + ...
+    %         opts.WakeLengthChords*(1-cos(linspace(0,pi/2,N))).';
+    % elseif strcmpi(opts.NodeSpacing,'uniform')
+    %     wakes.xo(k,:) = foils.xo(1+(i-1)*foils.m(1)) + ...
+    %         linspace(0,opts.WakeLengthChords,N).';
+    % end
+    wakes.xo(k,1) = [x(1:n-1); x(n)+traj(1)*stencil];
+    wakes.yo(k,1) = [y(1:n-1); y(n)+traj(2)*stencil];
+    wakes.dx(k,1) = [diff(wakes.xo(k)); 1e3*traj(1)];
+    wakes.dy(k,1) = [diff(wakes.yo(k)); 1e3*traj(2)];
 end
-wakes.theta = zeros(2*N,1) + atan2(ry,rx);
+wakes.theta = atan2(wakes.dy,wakes.dx);
 wakes.co = [wakes.xo+wakes.dx/2 wakes.yo+wakes.dy/2];
 wakes.ds = sqrt(wakes.dx.^2 + wakes.dy.^2);
+wakes.so = [0; cumsum(wakes.ds(1:N-1)); 0; cumsum(wakes.ds(N+1:2*N-1))];
 
 % Create initial guess for wake circulation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 gammaInf = sqrt(2*CT + 1) - 1;
@@ -58,10 +59,8 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
     iter = iter + 1;
 
     if strcmpi(opts.Display,'iter')
-        set(h(1),'XData',wakes.xo(1:N));
-        set(h(1),'YData',wakes.yo(1:N));
-        set(h(2),'XData',wakes.xo(N+1:2*N));
-        set(h(2),'YData',wakes.yo(N+1:2*N));
+        set(h(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
+        set(h(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
         drawnow;
     end
 
@@ -80,25 +79,24 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
     [U,V] = influence(wakes.co,wakes,0);
     u = u + U*wakes.gamma;
     v = v + V*wakes.gamma;
+    Vbar = sqrt(u.*u + v.*v);
 
     % Update wake shape %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%    wakes.dy = v./u.*wakes.dx;
-%    wakes.dy([N 2*N]) = 0; % far-field panels remain flat
-    Vbar = sqrt(u.*u + v.*v);
     wakes.dx = u./Vbar.*wakes.ds;
     wakes.dy = v./Vbar.*wakes.ds;
+    % wakes.dy([N 2*N]) = 0; % far-field panels remain flat
     wakes.xo(  2:N  ) = wakes.xo(1)   + cumsum(wakes.dx(  1:N-1  ));
     wakes.xo(N+2:2*N) = wakes.xo(N+1) + cumsum(wakes.dx(N+1:2*N-1));
     wakes.yo(  2:N  ) = wakes.yo(1)   + cumsum(wakes.dy(  1:N-1  ));
     wakes.yo(N+2:2*N) = wakes.yo(N+1) + cumsum(wakes.dy(N+1:2*N-1));
-    % Handle wakes crossing
-    if wakes.yo(N) >= wakes.yo(2*N)
-        yd = wakes.yo(2*N) - wakes.yo(N) - 0.025;
-        % Rebuild YO of the lower wake directly rather than through CUMSUM
-        wakes.yo(2:N) = wakes.yo(2:N) + yd* ...
-            (wakes.xo(2:N)-wakes.xo(1))/opts.WakeLengthChords;
-        wakes.dy(1:N-1) = diff(wakes.yo(1:N));
-    end
+    % % Handle wakes crossing
+    % if wakes.yo(N) >= wakes.yo(2*N)
+    %     yd = wakes.yo(2*N) - wakes.yo(N) - 0.025;
+    %     % Rebuild YO of the lower wake directly rather than through CUMSUM
+    %     wakes.yo(2:N) = wakes.yo(2:N) + yd* ...
+    %         (wakes.xo(2:N)-wakes.xo(1))/opts.WakeLengthChords;
+    %     wakes.dy(1:N-1) = diff(wakes.yo(1:N));
+    % end
     wakes.theta = atan2(wakes.dy,wakes.dx);
     wakes.co(:,1) = wakes.xo + wakes.dx/2;
     wakes.co(:,2) = wakes.yo + wakes.dy/2;
@@ -106,8 +104,7 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
     % Update wake circulation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     g = CT./Vbar;
     g(N+1:2*N) = -g(N+1:2*N);
-    % It is unclear if interpolating over x (faster) is less accurate than
-    % interpolating over panel length (slower)
+    % Interpolate circulation values from panel midpoints to endpoints
     gnew(  2:N    ) = g(  1:N-1  ) + diff(g(  1:N  )).* ...
         wakes.ds(  1:N-1  )./(wakes.ds(  1:N-1  )+wakes.ds(  2:N  ));
     gnew(N+3:2*N+1) = g(N+1:2*N-1) + diff(g(N+1:2*N)).* ...
@@ -115,12 +112,12 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
     gnew(1)   = 2*g(1)   - gnew(2);
     gnew(N+2) = 2*g(N+1) - gnew(N+3);
     % Decay circulation to the far-field value
-    k = find(wakes.xo(  1:N  ) >= wakes.xo(N)   - opts.GammaDecayChords, 1);
+    k = find(wakes.so(  1:N  ) >= wakes.so(N)   - opts.GammaDecayChords, 1);
     gnew(    k:N    ) =  gammaInf + ( gammaInf-gnew(k)    )* ...
-        (wakes.xo(  k:N  )-wakes.xo(N)  )/(wakes.xo(N)  -wakes.xo(k)  +eps);
-    k = find(wakes.xo(N+1:2*N) >= wakes.xo(2*N) - opts.GammaDecayChords, 1);
+        (wakes.so(  k:N  )-wakes.so(N)  )/(wakes.so(N)  -wakes.so(k)  +eps);
+    k = find(wakes.so(N+1:2*N) >= wakes.so(2*N) - opts.GammaDecayChords, 1);
     gnew(N+1+k:2*N+1) = -gammaInf + (-gammaInf-gnew(k+N+1))* ...
-        (wakes.xo(N+k:2*N)-wakes.xo(2*N))/(wakes.xo(2*N)-wakes.xo(k+N)+eps);
+        (wakes.so(N+k:2*N)-wakes.so(2*N))/(wakes.so(2*N)-wakes.so(k+N)+eps);
 
     % Calculate residual between current and previous iteration %%%%%%%%%%%%%%
     E = sum(abs(gnew - wakes.gamma))/(2*N*gammaInf);
@@ -131,7 +128,48 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
 end
 
 if strcmpi(opts.Display,'iter') || strcmpi(opts.Display,'final')
-    set(h(1),'YData',wakes.yo(1:N));
-    set(h(2),'YData',wakes.yo(N+1:2*N));
+    set(h(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
+    set(h(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
     drawnow;
+end
+end
+
+function [xout,yout,traj] = initWake(foils,gamma)
+    idx = [0 0];
+    for i = 1:2
+        idx = idx(2) + [1 foils.m(i)];
+        r = [foils.dx(idx) foils.dy(idx)];
+        R = sqrt(r(:,1).^2 + r(:,2).^2);
+        c = 0.5*(-r(1,:)/R(1) + r(2,:)/R(2)); % camber direction vector
+        y0([i i+2]) = [foils.xo(idx(1)) foils.yo(idx(1))] + ...
+            c/sqrt(c(1)*c(1) + c(2)*c(2)) * 0.25*min(R);
+    end
+    [t,y] = ode45(@objfun,[0 1],y0);
+    N = size(y,1);
+    % Anchor first point to exactly the trailing edge
+    y(1,1:2) = foils.xo([1 foils.m(1)+1]);
+    y(1,3:4) = foils.yo([1 foils.m(1)+1]);
+
+    % Trim wakes to have a clean trajectory
+    k1 = N; k2 = N;
+    prp = [y(k2,2)-y(k1,1) y(k2,4)-y(k1,3)];
+    par = [y(k1-1,1)-y(k1,1) y(k1-1,3)-y(k1,3)];
+    E = dot(prp,par)/norm(prp)/norm(par);
+    while abs(E) > 0.05
+        if E > 0; k1 = k1 - 1; else; k2 = k2 - 1; end
+        prp = [y(k2,2)-y(k1,1) y(k2,4)-y(k1,3)];
+        par = [y(k1-1,1)-y(k1,1) y(k1-1,3)-y(k1,3)];
+        E = dot(prp,par)/norm(prp)/norm(par);
+    end
+
+    xout = {y(1:k1,1), y(1:k2,2)};
+    yout = {y(1:k1,3), y(1:k2,4)};
+    traj = [prp(2) -prp(1)]/norm(prp);
+
+    function dydt = objfun(t,y)
+        dydt = zeros(4,1);
+        [U,V] = influence(reshape(y,[2 2]),foils,1);
+        dydt(1:2) = U*gamma + 1;
+        dydt(3:4) = V*gamma;
+    end
 end
