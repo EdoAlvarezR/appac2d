@@ -60,8 +60,24 @@ else
     [U,V] = influence(foils.co,wakes,1);
     D = U.*cos(foils.theta) + V.*sin(foils.theta);
     Qtan = B*foils.gamma + cos(foils.theta) + D*wakes.gamma;
+    % Qtan = cos(foils.theta) + D*wakes.gamma;
     out = {foils,wakes};
 end
+
+% % Qtan(1:foils.m(1)) = Qtan(1:foils.m(1)) + (foils.gamma(2:foils.m(1)+1) + foils.gamma(1:foils.m(1)))/2;
+
+% Qtan(1:foils.m(1)) = Qtan(1:foils.m(1)) + (foils.gamma(2:foils.m(1)+1) + foils.gamma(1:foils.m(1)))/4;
+
+
+% % Qtan(foils.m(1)+1:foils.m(1)+foils.m(2)) = Qtan(foils.m(1)+1:foils.m(1)+foils.m(2)) - ...
+% %             (foils.gamma(foils.m(1)+2:foils.m(1)+foils.m(2)+1) + foils.gamma(foils.m(1)+3:foils.m(1)+foils.m(2)+2))/4;
+
+% qt = mat2cell(Qtan, foils.m)
+% gammas = mat2cell(foils.gamma, foils.m+1)
+
+% Qtan(foils.m(1)+1:foils.m(1)+foils.m(2)) = qt{2} - (gammas{2}(1:end-1) + gammas{2}(2:end))/2/2
+
+% % Qtan(foils.m(1)+1:foils.m(1)+foils.m(2)) = Qtan(foils.m(1)+1:foils.m(1)+foils.m(2)) + (foils.gamma(foils.m(1)+1:foils.m(1)+foils.m(2)) + foils.gamma(foils.m(1)+2:foils.m(1)+foils.m(2)+1))/2;
 
 % Calculate coefficients %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Cparr = 1 - Qtan.^2;
@@ -71,12 +87,12 @@ xc = mat2cell(foils.co*R(1,:).', foils.m);
 if oper == 2
     % Correct Cp aft of the actuator disk where the total pressure is higher
     k1 = find(xc{1} < xDisk, 1, 'last');
-    % k2 = find(xc{2} < xDisk, 1, 'first');
-    % Cparr(k1+1:foils.m(1)+k2-1) = Cparr(k1+1:foils.m(1)+k2-1) + 2*CT;
+    k2 = find(xc{2} < xDisk, 1, 'first');
+    Cparr(k1+1:foils.m(1)+k2-1) = Cparr(k1+1:foils.m(1)+k2-1) + 2*CT;
 
-    k2 = find(xc{2} < xDisk, 1, 'last');
-    Cparr(k1+1:foils.m(1)+1) = Cparr(k1+1:foils.m(1)+1) + 2*CT;
-    Cparr(foils.m(1)+k2:foils.m(1)+foils.m(2)) = Cparr(foils.m(1)+k2:foils.m(1)+foils.m(2)) + 2*CT;
+    % k2 = find(xc{2} < xDisk, 1, 'last');
+    % Cparr(k1+1:foils.m(1)+1) = Cparr(k1+1:foils.m(1)+1) + 2*CT;
+    % Cparr(foils.m(1)+k2:foils.m(1)+foils.m(2)) = Cparr(foils.m(1)+k2:foils.m(1)+foils.m(2)) + 2*CT;
 end
 
 Cl = -Cparr.'*foils.dx;
