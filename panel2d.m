@@ -92,7 +92,7 @@ if strcmpi(options.Plot,'on')
 end
 
 % Print integrated values at the very end
-fprintf(1,'%+4s: %8.5f\n','Cl',Cl,'Cd',Cd,'Cm',Cm,'Cm25',Cm25);
+% fprintf(1,'%+4s: %8.5f\n','Cl',Cl,'Cd',Cd,'Cm',Cm,'Cm25',Cm25);
 
 nout = max(nargout,1) - 7;
 for i = 1:nout
