@@ -1,4 +1,4 @@
-function [Cp,xc,Cl,Cd,Cm,visout,varargout] = panel2d(surfaces,alphaDeg,varargin)
+function [Cp,xc,yc,Cl,Cd,Cm,visout,varargout] = panel2d(surfaces,alphaDeg,varargin)
 % PANEL2D  Panel method in two dimensions.
 %   PANEL2D(SURFACES,ALPHADEG) runs a standard panel method.
 %   PANEL2D(SURFACES,ALPHADEG,CT,XDISK) runs the APPAC aeropropulsive analysis
@@ -67,6 +67,7 @@ end
 Cparr = 1 - Qtan.^2;
 
 xc = mat2cell(foils.co*R(1,:).', foils.m);
+yc = mat2cell(foils.co*R(2,:).', foils.m);
 
 if oper == 2
     % Correct Cp aft of the actuator disk where the total pressure is higher
@@ -91,9 +92,9 @@ if strcmpi(options.Plot,'on')
 end
 
 % Print integrated values at the very end
-fprintf(1,'%+4s: %8.5f\n','Cl',Cl,'Cd',Cd,'Cm25',Cm25);
+fprintf(1,'%+4s: %8.5f\n','Cl',Cl,'Cd',Cd,'Cm',Cm,'Cm25',Cm25);
 
-nout = max(nargout,1) - 6;
+nout = max(nargout,1) - 7;
 for i = 1:nout
     varargout{i} = out{i};
 end
