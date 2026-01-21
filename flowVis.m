@@ -17,7 +17,8 @@ olfs.dhdx = +0.15;
 hfun = @trihfn2;
 
 bb = [min(foils.co),max(foils.co)]; % bounding box
-bb = bb + [-0.7 -0.7 0.7 0.5];
+% bb = bb + [-0.7 -0.7 0.7 0.5];
+bb = bb + [-5.0 -5.0 5.0 5.0];
 
 
 %---------------------------------------------- do size-fun.
