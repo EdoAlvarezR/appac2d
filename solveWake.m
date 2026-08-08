@@ -1,4 +1,4 @@
-function [wakes,gamma,iter,E] = solveWake(foils,Ainv,RHS,CT,opts)
+function [wakes,gamma,iter,E] = solveWake(foils,h,Ainv,RHS,CT,opts)
 % SOLVEWAKE  Solve for the global circulation solution and wake shape using
 % Shollenberger's algorithm:
 %   1. Guess initial wake shape and bound circulation
@@ -12,14 +12,22 @@ function [wakes,gamma,iter,E] = solveWake(foils,Ainv,RHS,CT,opts)
 %   7. If the new wake circulation is close to the previous solution, exit the
 %      program, else return to step 2
 
+% Setup for airfoil bound circulation convergence criterion %%%%%%%%%%%%%%%%%%
+ia = cumsum(foils.m); % index of the first point on the last panel
+ib = ia - foils.m + 1; % index of the second point on the last panel
+M = ia(end); % total number of airfoil panels
+edge = (1:M).' + [0 1]; % edges defined by [first point, second point]
+edge(ia,2) = ib; % correct index wraps
+ds = sqrt(foils.dx.^2 + foils.dy.^2); % panel widths for integration
+gamma = Ainv*RHS; % initial unpowered solution
+circ = 0.5*(gamma(edge(:,1)) + gamma(edge(:,2)));
+
 % Attach wake to the trailing edge of each propulsive element %%%%%%%%%%%%%%%%
 N = opts.NumPanels + 1; % add far-field panel to the panel count
 wakes.m = [N N];
-[xinit,yinit,traj] = initWake(foils,Ainv*RHS); % obtain starting wake shape
+[wakes.xo,wakes.yo] = initWake(foils,h,Ainv*RHS,opts); % obtain starting wake shape
 for i = 2:-1:1
     k = (i-1)*N+(1:N);
-    x = xinit{i}; y = yinit{i}; n = numel(x);
-    stencil = linspace(0,opts.WakeLengthChords,N-n+1).';
     % if strcmpi(opts.NodeSpacing,'cosine')
     %     wakes.xo(k,:) = foils.xo(1+(i-1)*foils.m(1)) + ...
     %         opts.WakeLengthChords*(1-cos(linspace(0,pi/2,N))).';
@@ -27,10 +35,8 @@ for i = 2:-1:1
     %     wakes.xo(k,:) = foils.xo(1+(i-1)*foils.m(1)) + ...
     %         linspace(0,opts.WakeLengthChords,N).';
     % end
-    wakes.xo(k,1) = [x(1:n-1); x(n)+traj(1)*stencil];
-    wakes.yo(k,1) = [y(1:n-1); y(n)+traj(2)*stencil];
-    wakes.dx(k,1) = [diff(wakes.xo(k)); 1e3*traj(1)];
-    wakes.dy(k,1) = [diff(wakes.yo(k)); 1e3*traj(2)];
+    wakes.dx(k,1) = [diff(wakes.xo(k)); 1e3];
+    wakes.dy(k,1) = [diff(wakes.yo(k)); 0];
 end
 wakes.theta = atan2(wakes.dy,wakes.dx);
 wakes.co = [wakes.xo+wakes.dx/2 wakes.yo+wakes.dy/2];
@@ -49,8 +55,8 @@ if strcmpi(opts.Display,'iter') || strcmpi(opts.Display,'final')
         plot(foils.xo(k+[1:foils.m(i) 1]),foils.yo(k+[1:foils.m(i) 1]),'k-');
         k = k + foils.m(i);
     end
-    h(1) = plot(wakes.xo(1:N),wakes.yo(1:N),'b-');
-    h(2) = plot(wakes.xo(N+1:2*N),wakes.yo(N+1:2*N),'r-');
+    hp(1) = plot(wakes.xo(1:N),wakes.yo(1:N),'b-');
+    hp(2) = plot(wakes.xo(N+1:2*N),wakes.yo(N+1:2*N),'r-');
 end
 
 iter = 0;
@@ -59,13 +65,13 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
     iter = iter + 1;
 
     if strcmpi(opts.Display,'iter')
-        set(h(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
-        set(h(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
+        set(hp(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
+        set(hp(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
         drawnow;
     end
 
     % Solve airfoil circulation distribution %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    [U,V] = influence(foils.co,wakes,1);
+    [U,V] = velmat(foils.co,wakes,1,h);
     A = -U.*sin(foils.theta) + V.*cos(foils.theta);
     gamma = Ainv*(RHS - [A*wakes.gamma; ...
                          -wakes.gamma(1); ...
@@ -73,10 +79,10 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
                          zeros(numel(foils.m)-2,1)]);
 
     % Calculate induced velocities on wake boundaries %%%%%%%%%%%%%%%%%%%%%%%%
-    [U,V] = influence(wakes.co,foils,1);
+    [U,V] = velmat(wakes.co,foils,1,h);
     u = U*gamma + 1;
     v = V*gamma;
-    [U,V] = influence(wakes.co,wakes,0);
+    [U,V] = velmat(wakes.co,wakes,0,h);
     u = u + U*wakes.gamma;
     v = v + V*wakes.gamma;
     Vbar = sqrt(u.*u + v.*v);
@@ -120,7 +126,18 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
         (wakes.so(N+k:2*N)-wakes.so(2*N))/(wakes.so(2*N)-wakes.so(k+N)+eps);
 
     % Calculate residual between current and previous iteration %%%%%%%%%%%%%%
-    E = sum(abs(gnew - wakes.gamma))/(2*N*gammaInf);
+    if opts.ConvergenceCriterion == 1
+        E = sum(abs(gnew - wakes.gamma))/(2*N*gammaInf);
+    elseif opts.ConvergenceCriterion == 2
+        circnew = 0.5*(gamma(edge(:,1)) + gamma(edge(:,2)));
+        % E = dot(abs(circnew - circ),ds);
+        dbound = cellfun(@sum,mat2cell((circnew - circ).*ds,foils.m));
+        E = max(abs(dbound));
+        circ = circnew;
+    else
+        error('solveWake:invalidValue', ...
+            'Invalid value for convergence criterion selector.')
+    end
 
     % Adjust wake circulation by a relaxation factor %%%%%%%%%%%%%%%%%%%%%%%%%
     wakes.gamma = opts.RelaxationFactor*gnew + ...
@@ -128,13 +145,13 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
 end
 
 if strcmpi(opts.Display,'iter') || strcmpi(opts.Display,'final')
-    set(h(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
-    set(h(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
+    set(hp(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
+    set(hp(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
     drawnow;
 end
 end
 
-function [xout,yout,traj] = initWake(foils,gamma)
+function [xout,yout] = initWake(foils,h,gamma,opts)
     idx = [0 0];
     for i = 1:2
         idx = idx(2) + [1 foils.m(i)];
@@ -144,31 +161,22 @@ function [xout,yout,traj] = initWake(foils,gamma)
         y0([i i+2]) = [foils.xo(idx(1)) foils.yo(idx(1))] + ...
             c/sqrt(c(1)*c(1) + c(2)*c(2)) * 0.25*min(R);
     end
-    [t,y] = ode45(@objfun,[0 1],y0);
+    [t,y] = ode45(@objfun,[0 opts.WakeLengthChords],y0);
     N = size(y,1);
+
+    tspan = interp1(t,linspace(1,N,opts.NumPanels+1).');
+    [t,y] = ode45(@objfun,tspan,y0);
+
     % Anchor first point to exactly the trailing edge
     y(1,1:2) = foils.xo([1 foils.m(1)+1]);
     y(1,3:4) = foils.yo([1 foils.m(1)+1]);
 
-    % Trim wakes to have a clean trajectory
-    k1 = N; k2 = N;
-    prp = [y(k2,2)-y(k1,1) y(k2,4)-y(k1,3)];
-    par = [y(k1-1,1)-y(k1,1) y(k1-1,3)-y(k1,3)];
-    E = dot(prp,par)/norm(prp)/norm(par);
-    while abs(E) > 0.05
-        if E > 0; k1 = k1 - 1; else; k2 = k2 - 1; end
-        prp = [y(k2,2)-y(k1,1) y(k2,4)-y(k1,3)];
-        par = [y(k1-1,1)-y(k1,1) y(k1-1,3)-y(k1,3)];
-        E = dot(prp,par)/norm(prp)/norm(par);
-    end
-
-    xout = {y(1:k1,1), y(1:k2,2)};
-    yout = {y(1:k1,3), y(1:k2,4)};
-    traj = [prp(2) -prp(1)]/norm(prp);
+    xout = [y(:,1); y(:,2)];
+    yout = [y(:,3); y(:,4)];
 
     function dydt = objfun(t,y)
         dydt = zeros(4,1);
-        [U,V] = influence(reshape(y,[2 2]),foils,1);
+        [U,V] = velmat(reshape(y,[2 2]),foils,1,h);
         dydt(1:2) = U*gamma + 1;
         dydt(3:4) = V*gamma;
     end

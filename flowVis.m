@@ -1,6 +1,6 @@
-function visout = flowVis(options,foils,varargin)
+function fig = flowVis(options,foils,h,varargin)
 % FLOWVIS  Visualize flow around surfaces with bound vorticity.
-%   FLOWVIS(OPTIONS,FOILS,WAKES,K1,K2) creates a contour plot with overlaid
+%   FLOWVIS(OPTIONS,FOILS,H,WAKES,K1,K2) creates a contour plot with overlaid
 %   streamlines using the style specified in OPTIONS. At minimum, the unified
 %   struct FOILS containing the solid surfaces must be given. If there is a
 %   powered wake, all of WAKES, K1, and K2 must be given where WAKES is the
@@ -17,13 +17,13 @@ olfs.dhdx = +0.15;
 hfun = @trihfn2;
 
 bb = [min(foils.co),max(foils.co)]; % bounding box
-% bb = bb + [-0.7 -0.7 0.7 0.5];
-bb = bb + [-5.0 -5.0 5.0 5.0];
+bb = bb + [-0.7 -0.7 0.7 0.5];
+% bb = bb + [-5.0 -5.0 5.0 5.0];
+if isfinite(h)
+    bb(2) = 0;
+end
 
-
-%---------------------------------------------- do size-fun.
-
-if nargin == 5
+if nargin == 6
     wakes = varargin{1};
     k1 = varargin{2};
     k2 = varargin{3};
@@ -52,10 +52,10 @@ if nargin == 5
 
     [vert{1},~,tria{1},~] = refine2(node,edge,[],opts,hfun,vlfs,tlfs,slfs,hlfs);
 
-    [U,V] = influence(vert{1},foils,1);
+    [U,V] = velmat(vert{1},foils,1,h);
     u{1} = U*foils.gamma + 1;
     v{1} = V*foils.gamma;
-    [U,V] = influence(vert{1},wakes,-1); % -1 for jet interior
+    [U,V] = velmat(vert{1},wakes,-1,h); % -1 for jet interior
     u{1} = u{1} + U*wakes.gamma;
     v{1} = v{1} + V*wakes.gamma;
 
@@ -83,36 +83,33 @@ if nargin == 5
 
     [vert{2},~,tria{2},~] = refine2(node,edge,[],opts,hfun,vlfs,tlfs,slfs,hlfs);
 
-    [U,V] = influence(vert{2},foils,1);
+    [U,V] = velmat(vert{2},foils,1,h);
     u{2} = U*foils.gamma + 1;
     v{2} = V*foils.gamma;
-    [U,V] = influence(vert{2},wakes,1);
+    [U,V] = velmat(vert{2},wakes,1,h);
     u{2} = u{2} + U*wakes.gamma;
     v{2} = v{2} + V*wakes.gamma;
 
     %---------------------------------- Merge the two meshes
     TRI = [tria{1};tria{2}+size(vert{1},1)];
     VTX = [vert{1};vert{2}];
-    data.u = [u{1};u{2}]; data.v = [v{1};v{2}];
+    data.u = [u{1};u{2}];
+    data.v = [v{1};v{2}];
 else
     j = cumsum(foils.m);
     node = [foils.co;4 2;-2 2;-2 -2;4 -2];
     edge = (1:j(end)+4).' + [0 1]; edge(j,2) = edge(j,2) - foils.m.';
     edge(end,2) = j(end) + 1;
-
-
-    [vlfs,tlfs, hlfs] = lfshfn2(node,edge,[],olfs);
-    [slfs] = idxtri2(vlfs,tlfs);
-
-    [VTX,~,TRI,~] = refine2(node,edge,[],opts,hfun,vlfs,tlfs,slfs,hlfs);
-    [U,V] = influence(VTX,foils,1);
+    [VTX,~,TRI,~] = refine2(node,edge,[],opts);
+    [U,V] = velmat(VTX,foils,1,h);
     data.u = U*foils.gamma + 1;
     data.v = V*foils.gamma;
 end
 
 data.q = sqrt(data.u.^2 + data.v.^2);
 data.p = 1 - data.q.^2;
-if nargin == 5
+if nargin == 6
+    % Apply total pressure correction inside the propulsive streamtube
     CT = 0.5*((abs(wakes.gamma(N+1)) + 1)^2 - 1);
     data.p(1:numel(u{1})) = data.p(1:numel(u{1})) + 2*CT;
 end
@@ -148,12 +145,15 @@ set(gca,'CLim',max(abs(cl-pivot))*[-1 1]+pivot);
 
 % Draw streamlines %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 FlowP = tristream(TRI,VTX(:,1),VTX(:,2),data.u,data.v, ...
-    zeros(1,51)+bb(1)+0.01,linspace(bb(2)+0.01,bb(4)-0.01,51));
+    zeros(1,51)+bb(1)+0.01,linspace(bb(2)+0.005,bb(4)-0.005,51));
 for i = 1:numel(FlowP)
     plot(FlowP(i).x,FlowP(i).y,'-','Color',LineColor);
 end
 
 % Configure window
+if isfinite(h)
+    bb(2) = -0.4; % ensure the window clips to the ground plane
+end
 axis([bb(1)+0.25 bb(3)-0.25 bb(2)+0.4 bb(4)-0.2]);
 pb = get(gca,'PlotBoxAspectRatio');
 pos = get(fig,'Position'); pos(3) = pos(4)*pb(1);
