@@ -1,12 +1,19 @@
-function [Cp,xc,yc,Cl,Cd,Cm,visout,varargout] = panel2d(surfaces,alphaDeg,varargin)
+function [Cp,xc,yc,Cl,Cd,Cm,visout,varargout] = panel2d(surfaces,alphaDeg,h,varargin)
 % PANEL2D  Panel method in two dimensions.
 %   PANEL2D(SURFACES,ALPHADEG) runs a standard panel method.
-%   PANEL2D(SURFACES,ALPHADEG,CT,XDISK) runs the APPAC aeropropulsive analysis
-%   PANEL2D(SURFACES,ALPHADEG,CT,XDISK,WAKEOPTIONS) to pass options to APPAC
+%   PANEL2D(SURFACES,ALPHADEG,H) adds a ground plane at a distance H.
+%   PANEL2D(SURFACES,ALPHADEG,[],CT,XDISK) runs the APPAC aeropropulsive analysis
+%   PANEL2D(SURFACES,ALPHADEG,[],CT,XDISK,WAKEOPTIONS) to pass options to APPAC
 %   PANEL2D(___,NAME,VALUE) to pass Name-Value arguments with any above syntax
 %
 %   See also INFLUENCE, SOLVEWAKE, FLOWVIS.
 [oper,CT,xDisk,wakeOptions,options] = parseInput(varargin);
+if nargin == 2
+    h = Inf;
+end
+if ~isscalar(h)
+    h = Inf;
+end
 
 nSurfs = numel(surfaces);
 
@@ -20,7 +27,7 @@ R = [cosd(alphaDeg) -sind(alphaDeg);sind(alphaDeg) cosd(alphaDeg)];
 for i = nSurfs:-1:1 % populating the last entry allocates necessary space
     foils.m(i) = size(surfaces{i},1) - 1;
 end
-M = sum([foils.m]); % total number of panels
+M = sum(foils.m); % total number of panels
 
 % Build unified struct for all lifting surfaces %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 k = M;
@@ -36,6 +43,9 @@ for i = nSurfs:-1:1
     foils.dy(1+k:foils.m(i)+k,:) = diff(coords(:,2));
 end
 foils.theta = atan2(foils.dy,foils.dx);
+if isfinite(h)
+    foils.yo = foils.yo + h;
+end
 foils.co = [foils.xo+foils.dx/2 foils.yo+foils.dy/2];
 
 % Create aerodynamic influence coefficient matrix %%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -45,7 +55,7 @@ for i = 1:nSurfs % Kutta condition
     A(M+i,k+foils.m(i)+1) = 1;
     k = k + foils.m(i) + 1;
 end
-[U,V] = influence(foils.co,foils,1);
+[U,V] = velmat(foils.co,foils,1,h);
 A(1:M,:) = -U.*sin(foils.theta) + V.*cos(foils.theta); % normal component
 B = U.*cos(foils.theta) + V.*sin(foils.theta); % tangent component
 RHS = [sin(foils.theta);zeros(nSurfs,1)];
@@ -56,8 +66,10 @@ if oper == 1
     Qtan = B*foils.gamma + cos(foils.theta);
     out{1} = foils;
 else
-    [wakes,foils.gamma,~,~] = solveWake(foils,inv(A),RHS,CT,wakeOptions);
-    [U,V] = influence(foils.co,wakes,1);
+    [wakes,foils.gamma,iter,res] = solveWake(foils,h,inv(A),RHS,CT,wakeOptions);
+    fprintf(1,'Iterations: %d\n',iter);
+    fprintf(1,'Residual: %.3e\n',res);
+    [U,V] = velmat(foils.co,wakes,1,h);
     D = U.*cos(foils.theta) + V.*sin(foils.theta);
     Qtan = B*foils.gamma + cos(foils.theta) + D*wakes.gamma;
     out = {foils,wakes};
@@ -66,8 +78,14 @@ end
 % Calculate coefficients %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Cparr = 1 - Qtan.^2;
 
-xc = mat2cell(foils.co*R(1,:).', foils.m);
-yc = mat2cell(foils.co*R(2,:).', foils.m);
+cx = foils.co(:,1);
+if isfinite(h)
+    cy = foils.co(:,2) - h;
+else
+    cy = foils.co(:,2);
+end
+xc = mat2cell([cx cy]*R(1,:).', foils.m);
+yc = mat2cell([cx cy]*R(2,:).', foils.m);
 
 if oper == 2
     % Correct Cp aft of the actuator disk where the total pressure is higher
@@ -87,8 +105,8 @@ Cp = mat2cell(Cparr, foils.m);
 % Data visualization %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 visout = -1;
 if strcmpi(options.Plot,'on')
-    if oper == 1; visout = flowVis(options,foils); end
-    if oper == 2; visout = flowVis(options,foils,wakes,k1,k2); end
+    if oper == 1; visout = flowVis(options,foils,h); end
+    if oper == 2; visout = flowVis(options,foils,h,wakes,k1,k2); end
 end
 
 % Print integrated values at the very end
@@ -112,6 +130,7 @@ xDisk = 0;
 % Default options
 wakeOptions.MaxIterations = 50;
 wakeOptions.FunctionTolerance = 1e-6;
+wakeOptions.ConvergenceCriterion = 1;
 wakeOptions.RelaxationFactor = 0.5;
 wakeOptions.NumPanels = 100;
 wakeOptions.WakeLengthChords = 9;
