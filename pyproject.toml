@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "appc"
+version = "0.0.1"
+description = "Aeropropulsive panel code, a Python wrapper of the OCTAVE source code"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    {name = "Ed Alvarez"},
+    {name = "Alan Hong"},
+]
+
+dependencies = [
+    "numpy >= 1.26.1",
+    "matplotlib >= 3.10.8",
+    "oct2py >= 5.8.0",
+    "octave_kernel >= 0.36.0",
+    "pyvista >= 0.44.2",
+    "pandas >= 3.0.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/EdoAlvarezR/appac2d"
+Repository = "https://github.com/EdoAlvarezR/appac2d"
+Issues = "https://github.com/EdoAlvarezR/appac2d/issues"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["appc*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+appc = [
+    "*.csv",
+    "*.json",
+    "*.pdf",
+]
