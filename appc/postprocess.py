@@ -6,7 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 def plot_wake(foils, wakes, aoa=0.0, delta=0.0, title="",
-              elements=["upper", "center", "lower"], save_path=None, file_prefix="jetfoil"):
+              elements=["upper", "center", "lower"], save_path=None, file_prefix="jetfoil",
+              ground_h=np.inf):
     
     # ------------- PLOT WAKE SHAPE ----------------------------------
     fig = plt.figure(figsize=np.array([10,5]))
@@ -40,10 +41,11 @@ def plot_wake(foils, wakes, aoa=0.0, delta=0.0, title="",
         ys_wake = wakes.yo[wakeindices]
         
         # Untwist APPC geometry
-        aoa_rad = aoa * math.pi/180
-        xs, ys = xs*math.cos(-aoa_rad) + ys*math.sin(-aoa_rad), -xs*math.sin(-aoa_rad) + ys*math.cos(-aoa_rad)
-        xs_wake, ys_wake = xs_wake*math.cos(-aoa_rad) + ys_wake*math.sin(-aoa_rad), \
-                                            -xs_wake*math.sin(-aoa_rad) + ys_wake*math.cos(-aoa_rad)
+        if not np.isfinite(ground_h):
+            aoa_rad = aoa * math.pi/180
+            xs, ys = xs*math.cos(-aoa_rad) + ys*math.sin(-aoa_rad), -xs*math.sin(-aoa_rad) + ys*math.cos(-aoa_rad)
+            xs_wake, ys_wake = xs_wake*math.cos(-aoa_rad) + ys_wake*math.sin(-aoa_rad), \
+                                                -xs_wake*math.sin(-aoa_rad) + ys_wake*math.cos(-aoa_rad)
         
         # Plot jetfoil contour
         ax.plot(xs, ys, "-", color="black", linewidth=1.0, alpha=1.0, clip_on=False)
@@ -73,7 +75,8 @@ def plot_wake(foils, wakes, aoa=0.0, delta=0.0, title="",
 
 def process_surface_pressure(foils, wakes, xc, yc, Cp, aoa=0.0, 
               elements=["upper", "center", "lower"], save_path=None, file_prefix="jetfoil",
-              export_pressure_csv=False, print_pressure_data=False):
+              export_pressure_csv=False, print_pressure_data=False,
+              ground_h=np.inf):
 
     pressure_data = {}
     centerofpressure_data = {}
@@ -97,9 +100,10 @@ def process_surface_pressure(foils, wakes, xc, yc, Cp, aoa=0.0,
         ys = foils.yo[indices].flatten()
         
         # Untwist jetfoil contour
-        aoa_rad = aoa * math.pi/180
-        xs, ys = xs*math.cos(-aoa_rad) + ys*math.sin(-aoa_rad), \
-                                            -xs*math.sin(-aoa_rad) + ys*math.cos(-aoa_rad)
+        if not np.isfinite(ground_h):
+            aoa_rad = aoa * math.pi/180
+            xs, ys = xs*math.cos(-aoa_rad) + ys*math.sin(-aoa_rad), \
+                                                -xs*math.sin(-aoa_rad) + ys*math.cos(-aoa_rad)
         
         # Fetch APPC2D data
         xs_appc = np.array(xc.tolist()[elementi][0]).flatten()
@@ -107,7 +111,8 @@ def process_surface_pressure(foils, wakes, xc, yc, Cp, aoa=0.0,
         Cps_appc = np.array(Cp.tolist()[elementi][0]).flatten()
         
         # Untwist APPC geometry
-        xs_appc, ys_appc = xs_appc*math.cos(-aoa_rad) + ys_appc*math.sin(-aoa_rad), \
+        if not np.isfinite(ground_h):
+            xs_appc, ys_appc = xs_appc*math.cos(-aoa_rad) + ys_appc*math.sin(-aoa_rad), \
                                             -xs_appc*math.sin(-aoa_rad) + ys_appc*math.cos(-aoa_rad)
 
         # Store pressure locations per element and optionally export to CSV.

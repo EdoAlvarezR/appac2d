@@ -1,4 +1,4 @@
-function fig = flowVis(options,foils,h,varargin)
+function visout = flowVis(options,foils,h,varargin)
 % FLOWVIS  Visualize flow around surfaces with bound vorticity.
 %   FLOWVIS(OPTIONS,FOILS,H,WAKES,K1,K2) creates a contour plot with overlaid
 %   streamlines using the style specified in OPTIONS. At minimum, the unified
