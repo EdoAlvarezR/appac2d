@@ -159,7 +159,8 @@ def process_surface_pressure(foils, wakes, xc, yc, Cp, aoa=0.0,
 def plot_surface_pressure(*args, title="",
               elements=["upper", "center", "lower"], save_path=None, file_prefix="jetfoil",
               return_pressure_data=False, export_pressure_csv=True,
-              invert_y=True, plot_centerofpressure=False, **kwargs):
+              invert_y=True, plot_centerofpressure=False, 
+              ground_h=np.inf, **kwargs):
 
 
     # ------------- PLOT SURFACE PRESSURE ---------------------------------
@@ -193,8 +194,8 @@ def plot_surface_pressure(*args, title="",
         ax.plot(xs_appc[[0, 10]], Cps_appc[[0, 10]], "*r", alpha=0.25, clip_on=False)
         
         # Plot jetfoil contour
-        ax2.plot(xs, ys, ":", color="black", linewidth=1.0, alpha=1.0, clip_on=False)
-        ax2.plot(xs[[0, 10]], ys[[0, 10]], "*r", alpha=0.25, clip_on=False)
+        ax2.plot(xs, ys - (ground_h if np.isfinite(ground_h) else 0), ":", color="black", linewidth=1.0, alpha=1.0, clip_on=False)
+        ax2.plot(xs[[0, 10]], ys[[0, 10]] - (ground_h if np.isfinite(ground_h) else 0), "*r", alpha=0.25, clip_on=False)
 
         # Plot center of pressure
         if plot_centerofpressure:
