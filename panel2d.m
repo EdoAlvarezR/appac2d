@@ -1,4 +1,4 @@
-function [Cp,xc,yc,Cl,Cd,Cm,visout,varargout] = panel2d(surfaces,alphaDeg,h,varargin)
+function [Cp,xc,yc,Cl,Cd,Cm,visout,iter,res,varargout] = panel2d(surfaces,alphaDeg,h,varargin)
 % PANEL2D  Panel method in two dimensions.
 %   PANEL2D(SURFACES,ALPHADEG) runs a standard panel method.
 %   PANEL2D(SURFACES,ALPHADEG,H) adds a ground plane at a distance H.
@@ -112,7 +112,7 @@ end
 % Print integrated values at the very end
 % fprintf(1,'%+4s: %8.5f\n','Cl',Cl,'Cd',Cd,'Cm',Cm,'Cm25',Cm25);
 
-nout = max(nargout,1) - 7;
+nout = max(nargout,1) - 9;
 for i = 1:nout
     varargout{i} = out{i};
 end
