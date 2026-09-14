@@ -97,7 +97,7 @@ end
 
 Cl = -Cparr.'*foils.dx;
 Cd =  Cparr.'*foils.dy;
-Cm = (Cparr.*foils.dx).'*foils.co(:,1) + (Cparr.*foils.dy).'*foils.co(:,2);
+Cm = (Cparr.*foils.dx).'*cx + (Cparr.*foils.dy).'*cy;
 Cm25 = Cm + 0.25*Cl;
 
 Cp = mat2cell(Cparr, foils.m);

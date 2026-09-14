@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 
 def plot_wake(foils, wakes, aoa=0.0, delta=0.0, title="",
               elements=["upper", "center", "lower"], save_path=None, file_prefix="jetfoil",
-              ground_h=np.inf):
+              ground_h=np.inf,
+              xlims=[-0.5, 3], ylims=[-0.75, 0.2]):
     
     # ------------- PLOT WAKE SHAPE ----------------------------------
     fig = plt.figure(figsize=np.array([10,5]))
@@ -57,8 +58,8 @@ def plot_wake(foils, wakes, aoa=0.0, delta=0.0, title="",
     ax.set_xlabel(r"$x$ (m)")
     ax.set_ylabel(r"$y$ (m)")
     
-    ax.set_xlim([-0.5, 3])
-    ax.set_ylim([-0.75, 0.2])
+    ax.set_xlim(xlims)
+    ax.set_ylim(ylims)
     
     ax.set_aspect("equal")
     ax.legend(loc="best", frameon=False, fontsize=10)
