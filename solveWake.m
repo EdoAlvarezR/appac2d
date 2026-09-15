@@ -61,13 +61,20 @@ end
 
 iter = 0;
 E = 1;
-while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
+while ((E > opts.FunctionTolerance) && (iter < opts.MaxIterations)) || (iter+1 <= opts.CTRelaxationIterations)
+    
     iter = iter + 1;
 
     if strcmpi(opts.Display,'iter')
         set(hp(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
         set(hp(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
         drawnow;
+    end
+
+    % Relax CT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    if iter <= opts.CTRelaxationIterations
+        relaxedCT = CT * iter/opts.CTRelaxationIterations
+        gammaInf = sqrt(2*relaxedCT + 1) - 1;
     end
 
     % Solve airfoil circulation distribution %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -88,13 +95,29 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
     Vbar = sqrt(u.*u + v.*v);
 
     % Update wake shape %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    wakes.dx = u./Vbar.*wakes.ds;
-    wakes.dy = v./Vbar.*wakes.ds;
-    % wakes.dy([N 2*N]) = 0; % far-field panels remain flat
+    % wakes.dx = u./Vbar.*wakes.ds;
+    % wakes.dy = v./Vbar.*wakes.ds;
+    % % wakes.dy([N 2*N]) = 0; % far-field panels remain flat
+
+    if opts.GeometryRelaxationFactor == -1
+        wakes.dx = opts.RelaxationFactor*u./Vbar.*wakes.ds + (1 - opts.RelaxationFactor)*wakes.dx;
+        wakes.dy = opts.RelaxationFactor*v./Vbar.*wakes.ds + (1 - opts.RelaxationFactor)*wakes.dy;
+    else
+        wakes.dx = opts.GeometryRelaxationFactor*u./Vbar.*wakes.ds + (1 - opts.GeometryRelaxationFactor)*wakes.dx;
+        wakes.dy = opts.GeometryRelaxationFactor*v./Vbar.*wakes.ds + (1 - opts.GeometryRelaxationFactor)*wakes.dy;
+    end
+
+    % Clip dx to keep the wake from curling
+    if opts.AvoidCurling
+        wakes.dx = max(wakes.dx, 0);
+    end
+
+    % Build wake shape
     wakes.xo(  2:N  ) = wakes.xo(1)   + cumsum(wakes.dx(  1:N-1  ));
     wakes.xo(N+2:2*N) = wakes.xo(N+1) + cumsum(wakes.dx(N+1:2*N-1));
     wakes.yo(  2:N  ) = wakes.yo(1)   + cumsum(wakes.dy(  1:N-1  ));
     wakes.yo(N+2:2*N) = wakes.yo(N+1) + cumsum(wakes.dy(N+1:2*N-1));
+
     % % Handle wakes crossing
     % if wakes.yo(N) >= wakes.yo(2*N)
     %     yd = wakes.yo(2*N) - wakes.yo(N) - 0.025;
@@ -103,6 +126,12 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
     %         (wakes.xo(2:N)-wakes.xo(1))/opts.WakeLengthChords;
     %     wakes.dy(1:N-1) = diff(wakes.yo(1:N));
     % end
+
+    % Clip y-position to not cross the ground
+    if isfinite(h)
+        wakes.yo = max(wakes.yo, 0);
+    end
+
     wakes.theta = atan2(wakes.dy,wakes.dx);
     wakes.co(:,1) = wakes.xo + wakes.dx/2;
     wakes.co(:,2) = wakes.yo + wakes.dy/2;
