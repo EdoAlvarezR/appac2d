@@ -44,9 +44,9 @@ def plot_jetfoil(upper, center, lower, save_path=None, file_prefix="jetfoil"):
     ax = fig.gca()
     
     # Plot contours
-    ax.plot(upper[:, 0], upper[:, 1], ".-", label="Upper element")
-    ax.plot(center[:, 0], center[:, 1], ".-", label="Centerbody")
-    ax.plot(lower[:, 0], lower[:, 1], ".-", label="Lower element")
+    ax.plot(upper[:, 0], upper[:, 1], ".-", label="Upper element", markersize=2.0)
+    ax.plot(center[:, 0], center[:, 1], ".-", label="Centerbody", markersize=2.0)
+    ax.plot(lower[:, 0], lower[:, 1], ".-", label="Lower element", markersize=2.0)
 
     nmarker_up = int(0.25 * upper.shape[0])
     nmarker_cb = int(0.25 * center.shape[0])
@@ -68,7 +68,7 @@ def plot_jetfoil(upper, center, lower, save_path=None, file_prefix="jetfoil"):
     fig.tight_layout()
     
     if save_path != None:
-        for ext in [".png", ".svg"]:
+        for ext in [".png"]:
             fig.savefig(os.path.join(save_path, file_prefix + "-geom" + ext), dpi=300, transparent=True)
 
     return fig, ax

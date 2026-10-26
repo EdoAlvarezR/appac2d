@@ -8,7 +8,10 @@ import matplotlib.pyplot as plt
 def plot_wake(foils, wakes, aoa=0.0, delta=0.0, title="",
               elements=["upper", "center", "lower"], save_path=None, file_prefix="jetfoil",
               ground_h=np.inf,
-              xlims=[-0.5, 3], ylims=[-0.75, 0.2]):
+              stl="-",
+              xlims=[-0.5, 3], ylims=[-0.75, 0.2],
+              turn_freestream=True,
+              **kwargs):
     
     # ------------- PLOT WAKE SHAPE ----------------------------------
     fig = plt.figure(figsize=np.array([10,5]))
@@ -42,16 +45,16 @@ def plot_wake(foils, wakes, aoa=0.0, delta=0.0, title="",
         ys_wake = wakes.yo[wakeindices]
         
         # Untwist APPC geometry
-        if not np.isfinite(ground_h):
+        if not np.isfinite(ground_h) and turn_freestream:
             aoa_rad = aoa * math.pi/180
             xs, ys = xs*math.cos(-aoa_rad) + ys*math.sin(-aoa_rad), -xs*math.sin(-aoa_rad) + ys*math.cos(-aoa_rad)
             xs_wake, ys_wake = xs_wake*math.cos(-aoa_rad) + ys_wake*math.sin(-aoa_rad), \
                                                 -xs_wake*math.sin(-aoa_rad) + ys_wake*math.cos(-aoa_rad)
         
         # Plot jetfoil contour
-        ax.plot(xs, ys, "-", color="black", linewidth=1.0, alpha=1.0, clip_on=False)
-        ax.plot(xs_wake, ys_wake, "-", color="green", linewidth=1.0, alpha=1.0, 
-                                        label="APPC" if eli==0 else "", clip_on=True)
+        ax.plot(xs, ys, "-", color="black", clip_on=False, **kwargs)
+        ax.plot(xs_wake, ys_wake, stl, color="green",
+                                        label="APPC" if eli==0 else "", clip_on=True, **kwargs)
         
         
     # Format plot
@@ -62,7 +65,7 @@ def plot_wake(foils, wakes, aoa=0.0, delta=0.0, title="",
     ax.set_ylim(ylims)
     
     ax.set_aspect("equal")
-    ax.legend(loc="best", frameon=False, fontsize=10)
+    # ax.legend(loc="best", frameon=False, fontsize=10)
     [ax.spines[side].set_visible(False) for side in ["top", "right"]]
     
     fig.tight_layout()
@@ -111,10 +114,11 @@ def process_surface_pressure(foils, wakes, xc, yc, Cp, aoa=0.0,
         ys_appc = np.array(yc.tolist()[elementi][0]).flatten()
         Cps_appc = np.array(Cp.tolist()[elementi][0]).flatten()
         
-        # Untwist APPC geometry
-        if not np.isfinite(ground_h):
-            xs_appc, ys_appc = xs_appc*math.cos(-aoa_rad) + ys_appc*math.sin(-aoa_rad), \
-                                            -xs_appc*math.sin(-aoa_rad) + ys_appc*math.cos(-aoa_rad)
+        # # Untwist APPC geometry
+        # # NOTE: No need for this step since APPC already untwisted xc and yc internally
+        # if not np.isfinite(ground_h):
+        #     xs_appc, ys_appc = xs_appc*math.cos(-aoa_rad) + ys_appc*math.sin(-aoa_rad), \
+        #                                     -xs_appc*math.sin(-aoa_rad) + ys_appc*math.cos(-aoa_rad)
 
         # Store pressure locations per element and optionally export to CSV.
         pressure_df = pd.DataFrame({
@@ -159,6 +163,7 @@ def process_surface_pressure(foils, wakes, xc, yc, Cp, aoa=0.0,
 
 def plot_surface_pressure(*args, title="",
               elements=["upper", "center", "lower"], save_path=None, file_prefix="jetfoil",
+              add_element_as_prefix=False,
               return_pressure_data=False, export_pressure_csv=True,
               invert_y=True, plot_centerofpressure=False, 
               ground_h=np.inf, **kwargs):
@@ -260,7 +265,14 @@ def plot_surface_pressure(*args, title="",
         # Save plots
         if save_path != None:
             for ext in [".png"]:
-                fig.savefig(os.path.join(save_path, file_prefix + "-Cp-" + element + ext), dpi=300, transparent=True)
+
+                fname = file_prefix + "-Cp" 
+                if add_element_as_prefix:
+                    fname = element + "-" + fname
+                else:
+                    fname = fname + "-" + element
+
+                fig.savefig(os.path.join(save_path, fname + ext), dpi=300, transparent=True)
 
         figs.append(fig)
         axs.append((ax, ax2))
